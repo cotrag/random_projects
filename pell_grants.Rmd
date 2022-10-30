@@ -1,0 +1,122 @@
+---
+title: "Pell Apps Over Time"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(leaflet)
+library(tidycensus)
+
+q4_2016 <- read_csv("https://www.dropbox.com/s/i8v15bvg7zud0w2/2017_2018App_Data_by_State_Q1.csv?dl=1")
+q1_2017 <- read_csv("https://www.dropbox.com/s/lmiu295s149ke9x/2017_2018App_Data_by_State_Q2.csv?dl=1")
+q2_2017 <- read_csv("https://www.dropbox.com/s/lvrkac9pqzdf6x2/2017_2018App_Data_by_State_Q3.csv?dl=1")
+q3_2017 <- read_csv("https://www.dropbox.com/s/uqavmuvclxoboe8/2017_2018App_Data_by_State_Q4.csv?dl=1")
+q4_2017 <- read_csv("https://www.dropbox.com/s/fovc93y5lupxpa4/2018_2019App_Data_by_State_Q1.csv?dl=1")
+q1_2018 <- read_csv("https://www.dropbox.com/s/s3lgmy4jo58nu3q/2018_2019App_Data_by_State_Q2.csv?dl=1")
+q2_2018 <- read_csv("https://www.dropbox.com/s/z77hek44sf8vhhp/2018_2019App_Data_by_State_Q3.csv?dl=1")
+q3_2018 <- read_csv("https://www.dropbox.com/s/e2yf8ylclo61unx/2018-2019-app-data-by-state-q4.csv?dl=1")
+q4_2018 <- read_csv("https://www.dropbox.com/s/h4mhfahkobzlq7q/2019-2020-app-data-by-state-q1.csv?dl=1")
+q1_2019 <- read_csv("https://www.dropbox.com/s/6vx4icqqmody1v6/2019-2020-app-data-by-state-q2.csv?dl=1")
+q2_2019 <- read_csv("https://www.dropbox.com/s/1giuscbuh3jy7zg/2019-2020-app-data-by-state-q3.csv?dl=1")
+q3_2019 <- read_csv("https://www.dropbox.com/s/t93bfysrmnuyocy/2019-2020-app-data-by-state-q4.csv?dl=1")
+q4_2019 <- read_csv("https://www.dropbox.com/s/ucav9h2wpffauua/2020-2021-app-data-by-state-q1.csv?dl=1")
+q1_2020 <- read_csv("https://www.dropbox.com/s/9jr5hti654e1b76/2020-2021-app-data-by-state-q2.csv?dl=1")
+q2_2020 <- read_csv("https://www.dropbox.com/s/5b2q2ip9gvp1dal/2020-2021-app-data-by-state-q3.csv?dl=1")
+q3_2020 <- read_csv("https://www.dropbox.com/s/dxn6d9x3lmyusjn/2020-2021-app-data-by-state-q4.csv?dl=1")
+q4_2020 <- read_csv("https://www.dropbox.com/s/orlng5x0i05ju7q/2021-2022-app-data-by-state-q1.csv?dl=1")
+q1_2021 <- read_csv("https://www.dropbox.com/s/0ze5bsvnccxucf2/2021-2022-app-data-by-state-q2.csv?dl=1")
+q2_2021 <- read_csv("https://www.dropbox.com/s/k4oq8h6o3fs75po/2020-2021-app-data-by-state-q7.csv?dl=1")
+
+# data()
+data("fips_codes")
+
+```
+
+
+## stack datasets together and group states
+```{r}
+
+slicer <- function(x) {
+  x <- x[1:8]
+}
+
+q1_2021 <- slicer(q1_2020)
+q2_2021 <- slicer(q2_2020)
+q4_2020 <- slicer(q4_2020)
+q3_2020 <- slicer(q3_2020)
+q2_2020 <- slicer(q2_2020)
+q1_2020 <- slicer(q1_2020)
+q4_2019 <- slicer(q4_2019)
+
+
+list_df = list(q2_2021, q1_2021, q4_2020, q3_2020, q2_2020, q1_2020, q4_2019, q3_2019, q2_2019, q1_2019, q4_2018, q3_2018, q2_2018, q1_2018, q4_2017, q3_2017, q2_2017, q1_2017, q4_2016)
+
+
+
+full_df <- do.call(rbind,list_df)
+
+```
+
+```{r}
+
+full_df$`Quarterly Total`
+
+grouped_df <- full_df %>% 
+  group_by(State) %>% 
+  summarise(avg_qtot = mean(`Quarterly Total`))
+
+grouped_df$avg_qtot <- round(grouped_df$avg_qtot , digits = 3)
+
+```
+
+
+```{r}
+
+df_to_map <- left_join(fips_codes, grouped_df, c("state_name" = "State"))
+
+df_to_map <- df_to_map %>% 
+  dplyr::select(c(state_code, avg_qtot))
+
+df_to_map <- df_to_map[!duplicated(df_to_map), ]
+
+df_to_map <- df_to_map %>% 
+  dplyr:::filter(state_code != c("60")) %>% 
+  dplyr:::filter(state_code != c("66")) %>% 
+  dplyr:::filter(state_code != c("69")) %>% 
+  dplyr:::filter(state_code != c("72")) %>% 
+  dplyr:::filter(state_code != c("74")) %>% 
+  dplyr:::filter(state_code != c("78"))
+
+```
+
+## MAP
+```{r}
+
+df_to_map <- rename(df_to_map, fips = state_code)
+
+plot_usmap( data = df_to_map, values = "avg_qtot", color = "white") +
+  scale_fill_continuous(name = "Average Quarterly Pell Apps") +
+  theme(legend.position = "right")
+
+```
+
+## LINE CHART 
+
+```{r}
+
+full_df <- full_df %>% separate(Date, c("date_1", "date_2"), sep = "-")
+
+head(full_df)
+
+full_df$date_1 <- as.Date(full_df$date_1, format = "%m/%d/%Y")
+
+df_trim <- full_df %>% 
+  dplyr::filter(State == "Ohio")
+
+ggplot(full_df, aes(x=date_1, y= `Quarterly Total`, colour=State)) + geom_line()
+
+
+```
+

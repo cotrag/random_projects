@@ -1,0 +1,68 @@
+---
+title: "mortgage"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+delinq_90 <- read.csv("/Users/connortragesser/Downloads/CountyMortgagesPercent_90_plus.csv")
+delinq_30_60 <- read.csv("/Users/connortragesser/Downloads/CountyMortgagesPercent-30-89DaysLate-thru-2021-06.csv")
+
+library(tidyverse)
+library(zoo)
+
+```
+
+## R Markdown
+
+```{r cars}
+
+delinq_90_long <- delinq_90 %>% 
+  pivot_longer(!c(RegionType, State, Name, FIPSCode), names_to = "Month", values_to = "share")
+
+delinq_30_60_long <- delinq_30_60 %>% 
+  pivot_longer(!c(RegionType, State, Name, FIPSCode), names_to = "Month", values_to = "share")
+
+
+nat_30_60 <- delinq_30_60_long %>% 
+  filter(RegionType == "National")
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+
+nat_30_60$year <- str_sub(nat_30_60$Month, 2, 5)
+nat_30_60$month <- str_sub(nat_30_60$Month, 7, 8)
+
+nat_30_60$date <- as.yearmon(paste(nat_30_60$year, nat_30_60$month), "%Y %m")
+
+
+ggplot(nat_30_60, aes(x = date, y = share)) +
+  geom_line()
+
+
+
+```
+
+```{r}
+
+delinq_30_60_long$year  <- str_sub(delinq_30_60_long$Month, 2, 5)
+delinq_30_60_long$month <- str_sub(delinq_30_60_long$Month, 7, 8)
+
+state_30_60 <- delinq_30_60_long %>% 
+  filter(RegionType == "County")
+
+
+state_30_60$date <- as.yearmon(paste(state_30_60$year, state_30_60$month), "%Y %m")
+
+
+ggplot(state_30_60, aes(x = date, y = share)) +
+  geom_line(aes(color= State))
+
+
+
+```
+

@@ -1,0 +1,152 @@
+---
+title: "census_pulse"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(leaflet)
+library(tidycensus)
+library(scales)
+pulse_39 <- read_csv("https://www.dropbox.com/s/pivqeh4aggk9pbb/pulse2021_puf_39.csv?dl=1")
+
+
+```
+
+##
+
+```{r}
+
+
+pulse_39_ctc_pop <- pulse_39 %>% 
+  filter(CTC_YN == 1) %>% 
+  filter(CTC_USE != -99)
+
+
+statevector <- sort(unique(pulse_39_ctc_pop$EST_ST))
+statevector_df <- as.data.frame(statevector)
+
+pct_given_var <- function(state_function_yp, var){
+  st_filter <- pulse_39_ctc_pop %>% 
+    filter(EST_ST == state_function_yp)
+  
+  var_grouped <- st_filter %>% 
+    dplyr::group_by({{var}}) %>% 
+    summarise(var_ans = sum(HWEIGHT))
+  
+  return(var_grouped)
+}
+
+pct_ctc_use <- function(state_function_yp){
+  
+  st_filter <- pulse_39_ctc_pop %>% 
+    filter(EST_ST == state_function_yp)
+  
+  var_grouped <- st_filter %>% 
+    dplyr::group_by(CTC_USE) %>% 
+    summarise(var_ans = sum(HWEIGHT))
+  
+  pct_calc <- var_grouped$var_ans[2]/
+  (var_grouped$var_ans[1] + var_grouped$var_ans[2] + var_grouped$var_ans[3])
+
+  return(pct_calc)
+}
+
+
+pct_ctc_food <- function(state_function_yp){
+  
+  st_filter <- pulse_39_ctc_pop %>% 
+    filter(EST_ST == state_function_yp)
+  
+  var_grouped <- st_filter %>% 
+    dplyr::group_by(CTCSPND1) %>% 
+    summarise(var_ans = sum(HWEIGHT))
+  
+  var_grouped_trim <- var_grouped %>% 
+    filter(CTCSPND1 == "1")
+  
+  pop <- sum(st_filter$HWEIGHT)
+  
+  pct_calc <- var_grouped_trim$var_ans[1]/pop
+
+  return(pct_calc)
+}
+
+```
+
+
+```{r, echo=FALSE}
+
+# PERCENT SAVED IN EACH STATE
+
+statevector_df <- statevector_df %>% 
+  mutate(row_id = row_number())
+
+pct_save_state_mapped <- map(statevector, 
+                             pct_ctc_use)
+
+pct_save_state_binded <- do.call("rbind", pct_save_state_mapped)
+pct_save_state_binded_df <- as.data.frame(pct_save_state_binded)
+pct_save_state_binded_df <- pct_save_state_binded_df %>% 
+  mutate(row_id = row_number())
+
+final_pct_save <- left_join(pct_save_state_binded_df, 
+                                    statevector_df,
+                                    by = c("row_id" = "row_id"))
+
+df_to_map <- rename(final_pct_save, fips = statevector)
+df_to_map <- df_to_map %>% 
+  select(c(V1, fips))
+
+```
+
+```{r, echo = FALSE}
+
+plot_usmap(data = df_to_map, values = "V1", color = "black") +
+  scale_fill_continuous(name = "% of Households who Mostly Save CTC", label = scales::percent, low = "white", high = "darkgreen") +
+  theme(legend.position = "right") +
+  labs(caption = "Source: Census PULSE Survey 39") +
+  theme(plot.caption = element_text(hjust = 0, face= "italic"),
+        text = element_text(family = "Georgia"))
+
+```
+
+
+```{r}
+# PERCENT WHO USED CTC TOWARD FOOD 
+
+statevector_df <- statevector_df %>% 
+  mutate(row_id = row_number())
+
+pct_food_state_mapped <- map(statevector, 
+                             pct_ctc_food)
+
+pct_food_state_binded <- do.call("rbind", pct_food_state_mapped)
+pct_food_state_binded_df <- as.data.frame(pct_food_state_binded)
+pct_food_state_binded_df <- pct_food_state_binded_df %>% 
+  mutate(row_id = row_number())
+
+final_pct_food <- left_join(pct_food_state_binded_df, 
+                                    statevector_df,
+                                    by = c("row_id" = "row_id"))
+
+df_to_map <- rename(final_pct_food, fips = statevector)
+df_to_map <- df_to_map %>% 
+  select(c(V1, fips))
+
+
+
+```
+
+```{r}
+plot_usmap(data = df_to_map, values = "V1", color = "black") +
+  scale_fill_continuous(name = "% of Households who used CTC for Food", label = scales::percent, low = "white", high = "darkgreen") +
+  theme(legend.position = "right") +
+  labs(caption = "Source: Census PULSE Survey 39") +
+  theme(plot.caption = element_text(hjust = 0, face= "italic"),
+        text = element_text(family = "Georgia"))
+```
+
+
+
